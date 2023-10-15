@@ -20,7 +20,8 @@ class CRYMP_API UCMPCharacterMovementComponent : public UCharacterMovementCompon
 	{
 		typedef FSavedMove_Character Super;
 
-		uint8 Saved_bWantsToSprint:1;
+		uint8 Saved_bWantsToRun:1;
+		uint8 Saved_bWantsToJog:1;
 
 	public:
 		FSavedMove_CMP();
@@ -42,10 +43,12 @@ class CRYMP_API UCMPCharacterMovementComponent : public UCharacterMovementCompon
 		virtual FSavedMovePtr AllocateNewMove() override;
 	};
 
-	bool Safe_bWantsToSprint;
+	bool Safe_bWantsToJog;
+	bool Safe_bWantsToRun;
 
-	UPROPERTY(EditDefaultsOnly) float Sprint_MaxWalkSpeed;
-	UPROPERTY(EditDefaultsOnly) float Walk_MaxWalkSpeed;
+	UPROPERTY(EditDefaultsOnly) float Run_MaxWalkSpeed = 480;
+	UPROPERTY(EditDefaultsOnly) float Jog_MaxWalkSpeed = 240.f;
+	UPROPERTY(EditDefaultsOnly) float Walk_MaxWalkSpeed = 180.f;
 	
 public:
 	UCMPCharacterMovementComponent();
@@ -57,7 +60,14 @@ protected:
 	virtual void OnMovementUpdated(float DeltaSeconds, const FVector& OldLocation, const FVector& OldVelocity) override;
 
 public:
-	UFUNCTION(BlueprintCallable) void StartSprint();
-	UFUNCTION(BlueprintCallable) void StopSprint();
+	UFUNCTION(BlueprintCallable) void StartRun();
+	UFUNCTION(BlueprintCallable) void StopRun();
+
+	UFUNCTION(BlueprintCallable) void StartJog();
+	UFUNCTION(BlueprintCallable) void StopJog();
+	
+	UFUNCTION(BlueprintCallable) void ToggleCrouch();
+	UFUNCTION(BlueprintCallable) void StartCrouch();
+	UFUNCTION(BlueprintCallable) void StopCrouch();
 	
 };

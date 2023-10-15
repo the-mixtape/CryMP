@@ -26,6 +26,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Camera)
 	UCameraComponent* FPCamera;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Meshes)
+	USkeletalMeshComponent* LegsMesh;
+
 public:
 	ACMPBaseCharacter(const FObjectInitializer& ObjectInitializer);
 
@@ -54,9 +57,17 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* LookAction;
 
-	/** Look Input Action */
+	/** Jog Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* SprintAction;
+	UInputAction* JogAction;
+
+	/** Run Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* RunAction;
+
+	/** Crouch Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* CrouchAction;
 
 protected:
 	/** Called for movement input */
@@ -64,9 +75,20 @@ protected:
 	
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
+
+	/** Called for jog input */
+	void JogStarted(const FInputActionValue& Value);
+	void JogFinished(const FInputActionValue& Value);
 	
-	/** Called for sptring input */
-	void SprintStarted(const FInputActionValue& Value);
-	void SprintFinished(const FInputActionValue& Value);
+	/** Called for run input */
+	void RunStarted(const FInputActionValue& Value);
+	void RunFinished(const FInputActionValue& Value);
+
+	/** Called for crouch input */
+	void CrouchPressed(const FInputActionValue& Value);
+
+	/** Called for jump input */
+	void JumpPressed(const FInputActionValue& Value);
+	void JumpReleased(const FInputActionValue& Value);
 #pragma endregion
 };

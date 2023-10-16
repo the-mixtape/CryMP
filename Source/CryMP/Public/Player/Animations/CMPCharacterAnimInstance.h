@@ -6,6 +6,16 @@
 #include "Animation/AnimInstance.h"
 #include "CMPCharacterAnimInstance.generated.h"
 
+
+UENUM(BlueprintType)
+enum EAnimOverlay : uint8
+{
+    EAO_Fists UMETA(DisplayName = "Fists"),
+    EAO_Rifle UMETA(DisplayName = "Rifle"),
+    EAO_Pistol UMETA(DisplayName = "Pistol")
+};
+
+
 /**
  * 
  */

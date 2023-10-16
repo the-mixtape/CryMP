@@ -27,7 +27,25 @@ protected:
 	UCameraComponent* FPCamera;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Meshes)
+	USkeletalMeshComponent* HeadMesh;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Meshes)
+	USkeletalMeshComponent* HairMesh;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Meshes)
+	USkeletalMeshComponent* MaskMesh;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Meshes)
+	USkeletalMeshComponent* JacketMesh;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Meshes)
+	USkeletalMeshComponent* VestMesh;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Meshes)
 	USkeletalMeshComponent* LegsMesh;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Meshes)
+	USkeletalMeshComponent* ShoesMesh;
 
 public:
 	ACMPBaseCharacter(const FObjectInitializer& ObjectInitializer);

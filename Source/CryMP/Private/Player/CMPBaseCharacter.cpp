@@ -17,10 +17,6 @@ ACMPBaseCharacter::ACMPBaseCharacter(const FObjectInitializer& ObjectInitializer
 	FPCamera = CreateDefaultSubobject<UCameraComponent>("FPCamera");
 	FPCamera->SetupAttachment(GetMesh(), "CameraSocket");
 	FPCamera->bUsePawnControlRotation = true;
-
-	LegsMesh = CreateDefaultSubobject<USkeletalMeshComponent>("Legs");
-	LegsMesh->SetupAttachment(GetMesh());
-	LegsMesh->SetLeaderPoseComponent(GetMesh());
 }
 
 void ACMPBaseCharacter::BeginPlay()

@@ -12,6 +12,7 @@ class UCMPCharacterMovementComponent;
 class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
+class UHandCombatComponent;
 
 
 UCLASS()
@@ -26,26 +27,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Camera)
 	UCameraComponent* FPCamera;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Meshes)
-	USkeletalMeshComponent* HeadMesh;
-	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Meshes)
-	USkeletalMeshComponent* HairMesh;
-	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Meshes)
-	USkeletalMeshComponent* MaskMesh;
-	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Meshes)
-	USkeletalMeshComponent* JacketMesh;
-	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Meshes)
-	USkeletalMeshComponent* VestMesh;
-	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Meshes)
-	USkeletalMeshComponent* LegsMesh;
-	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Meshes)
-	USkeletalMeshComponent* ShoesMesh;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Components)
+	UHandCombatComponent* HandCombatComponent;
 
 public:
 	ACMPBaseCharacter(const FObjectInitializer& ObjectInitializer);
@@ -55,6 +38,19 @@ protected:
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+public:
+	UFUNCTION(BlueprintCallable)
+	void PlayNetworkMontage(UAnimMontage* AnimMontage);
+
+	UFUNCTION(BlueprintCallable)
+	void PlayMontage(UAnimMontage* AnimMontage);
+	
+	UFUNCTION(Server, Reliable)
+	void ServerPlayMontage(UAnimMontage* AnimMontage);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MultiPlayMontage(UAnimMontage* AnimMontage);
+	
 
 #pragma region Input
 
@@ -87,6 +83,10 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* CrouchAction;
 
+	/** Fire Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* HandAttackAction;
+
 protected:
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
@@ -108,5 +108,8 @@ protected:
 	/** Called for jump input */
 	void JumpPressed(const FInputActionValue& Value);
 	void JumpReleased(const FInputActionValue& Value);
+
+	/** Called for hand attack input */
+	void HandAttackStarted(const FInputActionValue& Value);
 #pragma endregion
 };

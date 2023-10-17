@@ -25,6 +25,6 @@ public:
 	float Delay = .5f;
  
 private:
-	float LastTappedTime = 0.f;;
+	float LastTappedTime = 0.f;
 	bool bIsReleased = true;
 };

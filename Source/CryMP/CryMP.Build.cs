@@ -12,7 +12,7 @@ public class CryMP : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 		
-		PublicIncludePaths.AddRange(new string[] {"CryMP/Public/Framework", "CryMP/Public/Player"});
+		PublicIncludePaths.AddRange(new string[] {"CryMP/Public/Framework", "CryMP/Public/Player", "CryMP/Public/Components"});
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

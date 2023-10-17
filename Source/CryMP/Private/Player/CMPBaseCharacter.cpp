@@ -5,10 +5,11 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Camera/CameraComponent.h"
+#include "Components/HandCombatComponent.h"
 #include "Player/CMPCharacterMovementComponent.h"
 
 ACMPBaseCharacter::ACMPBaseCharacter(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer.SetDefaultSubobjectClass<UCMPCharacterMovementComponent>(CharacterMovementComponentName)) 
+	: Super(ObjectInitializer.SetDefaultSubobjectClass<UCMPCharacterMovementComponent>(CharacterMovementComponentName))
 {
 	PrimaryActorTick.bCanEverTick = true;
 
@@ -17,6 +18,8 @@ ACMPBaseCharacter::ACMPBaseCharacter(const FObjectInitializer& ObjectInitializer
 	FPCamera = CreateDefaultSubobject<UCameraComponent>("FPCamera");
 	FPCamera->SetupAttachment(GetMesh(), "CameraSocket");
 	FPCamera->bUsePawnControlRotation = true;
+
+	HandCombatComponent = CreateDefaultSubobject<UHandCombatComponent>("HandCombatComponent");
 }
 
 void ACMPBaseCharacter::BeginPlay()
@@ -41,16 +44,17 @@ void ACMPBaseCharacter::Tick(float DeltaTime)
 void ACMPBaseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
-	
+
 	if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent))
 	{
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACMPBaseCharacter::JumpPressed);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACMPBaseCharacter::JumpReleased);
-	
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this,
+		                                   &ACMPBaseCharacter::JumpReleased);
+
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ACMPBaseCharacter::Move);
-	
+
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ACMPBaseCharacter::Look);
-	
+
 		EnhancedInputComponent->BindAction(JogAction, ETriggerEvent::Started, this, &ACMPBaseCharacter::JogStarted);
 		EnhancedInputComponent->BindAction(JogAction, ETriggerEvent::Canceled, this, &ACMPBaseCharacter::JogFinished);
 		EnhancedInputComponent->BindAction(JogAction, ETriggerEvent::Completed, this, &ACMPBaseCharacter::JogFinished);
@@ -59,17 +63,43 @@ void ACMPBaseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Canceled, this, &ACMPBaseCharacter::RunFinished);
 		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Completed, this, &ACMPBaseCharacter::RunFinished);
 
-		EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Started, this, &ACMPBaseCharacter::CrouchPressed);
+		EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Started, this,
+		                                   &ACMPBaseCharacter::CrouchPressed);
+		
+		EnhancedInputComponent->BindAction(HandAttackAction, ETriggerEvent::Started, this, &ACMPBaseCharacter::HandAttackStarted);
 	}
+}
+
+void ACMPBaseCharacter::PlayNetworkMontage(UAnimMontage* AnimMontage)
+{
+	ServerPlayMontage(AnimMontage);
+}
+
+void ACMPBaseCharacter::PlayMontage(UAnimMontage* AnimMontage)
+{
+	if (const auto AnimInstance = GetMesh()->GetAnimInstance())
+	{
+		AnimInstance->Montage_Play(AnimMontage);
+	}
+}
+
+void ACMPBaseCharacter::MultiPlayMontage_Implementation(UAnimMontage* AnimMontage)
+{
+	PlayMontage(AnimMontage);
+}
+
+void ACMPBaseCharacter::ServerPlayMontage_Implementation(UAnimMontage* AnimMontage)
+{
+	MultiPlayMontage(AnimMontage);
 }
 
 #pragma region Input
 void ACMPBaseCharacter::Move(const FInputActionValue& Value)
 {
 	if (!Controller) return;
-	
+
 	const FVector2D MovementVector = Value.Get<FVector2D>();
-	
+
 	AddMovementInput(GetActorForwardVector(), MovementVector.Y);
 	AddMovementInput(GetActorRightVector(), MovementVector.X);
 }
@@ -77,7 +107,7 @@ void ACMPBaseCharacter::Move(const FInputActionValue& Value)
 void ACMPBaseCharacter::Look(const FInputActionValue& Value)
 {
 	if (!Controller) return;
-	
+
 	const FVector2D LookAxisVector = Value.Get<FVector2D>();
 
 	AddControllerYawInput(LookAxisVector.X);
@@ -87,58 +117,58 @@ void ACMPBaseCharacter::Look(const FInputActionValue& Value)
 void ACMPBaseCharacter::JogStarted(const FInputActionValue& Value)
 {
 	if (!Controller) return;
-	
-	if(CMPCharacterMovementComponent->IsCrouching())
+
+	if (CMPCharacterMovementComponent->IsCrouching())
 	{
 		CMPCharacterMovementComponent->StopCrouch();
 		return;
 	}
-	
+
 	CMPCharacterMovementComponent->StartJog();
 }
 
 void ACMPBaseCharacter::JogFinished(const FInputActionValue& Value)
 {
 	if (!Controller) return;
-	
+
 	CMPCharacterMovementComponent->StopJog();
 }
 
 void ACMPBaseCharacter::RunStarted(const FInputActionValue& Value)
 {
 	if (!Controller) return;
-	
-	if(CMPCharacterMovementComponent->IsCrouching())
+
+	if (CMPCharacterMovementComponent->IsCrouching())
 	{
 		CMPCharacterMovementComponent->StopCrouch();
 		return;
 	}
-	
+
 	CMPCharacterMovementComponent->StartRun();
 }
 
 void ACMPBaseCharacter::RunFinished(const FInputActionValue& Value)
 {
 	if (!Controller) return;
-	
+
 	CMPCharacterMovementComponent->StopRun();
 }
 
 void ACMPBaseCharacter::CrouchPressed(const FInputActionValue& Value)
 {
 	if (!Controller) return;
-	
+
 	CMPCharacterMovementComponent->ToggleCrouch();
 }
 
 void ACMPBaseCharacter::JumpPressed(const FInputActionValue& Value)
 {
-	if(CMPCharacterMovementComponent->IsCrouching())
+	if (CMPCharacterMovementComponent->IsCrouching())
 	{
 		CMPCharacterMovementComponent->StopCrouch();
 		return;
 	}
-	
+
 	ACharacter::Jump();
 }
 
@@ -146,4 +176,9 @@ void ACMPBaseCharacter::JumpReleased(const FInputActionValue& Value)
 {
 	ACharacter::StopJumping();
 }
-#pragma endregion 
+
+void ACMPBaseCharacter::HandAttackStarted(const FInputActionValue& Value)
+{
+	HandCombatComponent->PressedAttack();
+}
+#pragma endregion

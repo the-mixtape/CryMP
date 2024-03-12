@@ -39,19 +39,19 @@ struct FSightData
 	GENERATED_BODY()
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	ESightTypes SightType;
-	
+	ESightTypes SightType = ESightTypes::EST_IronSight;
+		
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FName OpticOrFrontSocket = "None";
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	UMeshComponent* OpticOrFrontComponent;
+	UMeshComponent* OpticOrFrontComponent = nullptr;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FName RearSocket = "None";
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	UMeshComponent* RearComponent;
+	UMeshComponent* RearComponent = nullptr;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FTransform HandTransform;
@@ -153,14 +153,14 @@ protected:
 	UPROPERTY(ReplicatedUsing=OnRep_CurrentParts, BlueprintReadOnly, Category="Parts")
 	TArray<AGunPartParent*> CurrentParts;
 
-	UPROPERTY(Replicated, BlueprintReadOnly, Category="Sights")
+	UPROPERTY(BlueprintReadOnly, Category="Sights")
 	TArray<FSightData> Sights;
 	
 	UPROPERTY(Replicated, BlueprintReadOnly, Category="Sights")
 	AMagParent* Magazine;
 
 	UPROPERTY(BlueprintReadOnly, Category="Sights")
-	uint8 CurrentSight;
+	int CurrentSight;
 
 	UPROPERTY(EditDefaultsOnly, Replicated, Category="Customization|Aiming")
 	float SightMaxAngle = 50;

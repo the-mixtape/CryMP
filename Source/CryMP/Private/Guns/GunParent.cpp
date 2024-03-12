@@ -47,7 +47,6 @@ void AGunParent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 	DOREPLIFETIME_CONDITION(AGunParent, SpreadHip, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(AGunParent, RecoilPerShot, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(AGunParent, StartingParts, COND_InitialOnly);
-	DOREPLIFETIME(AGunParent, Sights);
 	DOREPLIFETIME(AGunParent, Magazine);
 }
 
@@ -194,7 +193,7 @@ void AGunParent::AdjustLocation(AActor* Part, const UMeshComponent* PartComponen
 
 void AGunParent::GenerateOpticSights(AAssemblableParent* Part)
 {
-	for (const auto OpticAimPoint : Part->OpticAimPoints)
+	for (const auto& OpticAimPoint : Part->OpticAimPoints)
 	{
 		const bool bIsAimPointWithinMaxAngle = IsAimPointWithinMaxAngle(OpticAimPoint.MeshComponent,
 		                                                                OpticAimPoint.Socket);

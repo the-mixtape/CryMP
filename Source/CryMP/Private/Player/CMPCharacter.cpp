@@ -413,3 +413,8 @@ UCMPAnimInstance* ACMPCharacter::GetAnimInstance()
 
 	return CMPAnimInstance;
 }
+
+FTransform ACMPCharacter::GetRightHandTransform(ERelativeTransformSpace TransformSpace) const
+{
+	return GetMesh()->GetSocketTransform(RightHandSocketName, TransformSpace);
+}

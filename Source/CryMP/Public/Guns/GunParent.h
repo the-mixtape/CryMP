@@ -118,6 +118,11 @@ public:
 private:
 	void SetStartingFireMode();
 
+	void UpdateOpticSightsHandTransform();
+	void UpdateIronSightsHandTransform();
+
+	static FTransform CalculateIronSightTransform(const FVector& FrontLocation, const FVector& RearLocation, const FRotator& RearRotation);
+
 public:
 	UPROPERTY(BlueprintReadOnly)
 	bool bIsAiming;

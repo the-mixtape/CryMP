@@ -131,12 +131,13 @@ protected:
 protected:
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_CurrentWeapon)
 	AGunParent* CurrentWeapon;
+
+public:
+	UPROPERTY(BlueprintReadOnly, Replicated)
+	bool bInterpolateSight;
 	
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_HandTransform)
 	FTransform HandTransform;
-	
-	UPROPERTY(BlueprintReadOnly, Replicated)
-	bool bInterpolateSight;
 	
 private:
 	UPROPERTY()
@@ -195,4 +196,11 @@ protected:
 #pragma endregion
 
 	UCMPAnimInstance* GetAnimInstance();
+
+protected:
+	UPROPERTY(EditDefaultsOnly, Category="Customization|Sockets")
+	FName RightHandSocketName = "hand_r";
+	
+public:
+	FTransform GetRightHandTransform(ERelativeTransformSpace TransformSpace) const;
 };

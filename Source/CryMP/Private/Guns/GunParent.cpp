@@ -60,6 +60,21 @@ void AGunParent::UnEquip()
 
 void AGunParent::CalculateHandTransforms()
 {
+	const bool bHasSights = Sights.Num() > 0;
+
+	FTransform HandTransform;
+	if (bHasSights)
+	{
+		UpdateOpticSightsHandTransform();
+		UpdateIronSightsHandTransform();
+
+		const auto& SightData = Sights.GetData()[CurrentSight];
+		HandTransform = SightData.HandTransform;
+	}
+
+	CharacterOwner->bInterpolateSight = !bHasSights;
+	CharacterOwner->HandTransform = HandTransform;
+	
 }
 
 void AGunParent::SetStartingFireMode()
@@ -74,6 +89,63 @@ void AGunParent::SetStartingFireMode()
 
 	const auto ModesNum = AvailableFireModes.Num();
 	CurrentFireMode = AvailableFireModes.GetData()[ModesNum];
+}
+
+void AGunParent::UpdateOpticSightsHandTransform()
+{
+	for (auto& Sight : Sights)
+	{
+		if (Sight.SightType != ESightTypes::EST_Optic) continue;
+
+		const auto RightHandTransform = CharacterOwner->GetRightHandTransform(RTS_World);
+		const auto OpticAimPointTransform = Sight.OpticOrFrontComponent->GetSocketTransform(
+			Sight.OpticOrFrontSocket, RTS_World);
+
+		Sight.HandTransform = UKismetMathLibrary::MakeRelativeTransform(RightHandTransform, OpticAimPointTransform);
+	}
+}
+
+void AGunParent::UpdateIronSightsHandTransform()
+{
+	for (auto& Sight : Sights)
+	{
+		if (Sight.SightType != ESightTypes::EST_IronSight) continue;
+
+		const auto RightHandTransform = CharacterOwner->GetRightHandTransform(RTS_World);
+		const auto FrontAimPointLocation = Sight.OpticOrFrontComponent->GetSocketLocation(Sight.OpticOrFrontSocket);
+
+		FVector RearAimPointLocation;
+		FRotator RearAimPointRotation;
+		Sight.RearComponent->GetSocketWorldLocationAndRotation(Sight.RearSocket, RearAimPointLocation,
+		                                                       RearAimPointRotation);
+
+		const auto IronSightTransform = CalculateIronSightTransform(FrontAimPointLocation, RearAimPointLocation, RearAimPointRotation);
+		
+		Sight.HandTransform = UKismetMathLibrary::MakeRelativeTransform(RightHandTransform, IronSightTransform);
+	}
+}
+
+FTransform AGunParent::CalculateIronSightTransform(const FVector& FrontLocation, const FVector& RearLocation,
+	const FRotator& RearRotation)
+{
+	const auto RearUpVector = UKismetMathLibrary::GetUpVector(RearRotation);
+	const auto RearRightVector = UKismetMathLibrary::GetRightVector(RearRotation);
+	
+	const auto FromRearToFront = UKismetMathLibrary::Normal(FrontLocation - RearLocation);
+
+	const auto UpDotProd = UKismetMathLibrary::Dot_VectorVector(FromRearToFront, RearUpVector);
+	const auto RightDotProd = UKismetMathLibrary::Dot_VectorVector(FromRearToFront, RearRightVector);
+
+	const auto HorizontalAngle = UKismetMathLibrary::DegAsin(UpDotProd) * -1;
+	const auto VerticalAngle = UKismetMathLibrary::DegAsin(RightDotProd);
+
+	const auto Horizontal = UKismetMathLibrary::RotatorFromAxisAndAngle(RearRightVector, HorizontalAngle);
+	const auto Vertical = UKismetMathLibrary::RotatorFromAxisAndAngle(RearUpVector, VerticalAngle);
+	
+	const auto HorizontalCombine = UKismetMathLibrary::ComposeRotators(RearRotation, Horizontal);
+	const FRotator IronSightRotation = UKismetMathLibrary::ComposeRotators(HorizontalCombine, Vertical);
+	
+	return FTransform(IronSightRotation, FrontLocation);
 }
 
 void AGunParent::ResetGunProperties()
@@ -187,7 +259,7 @@ void AGunParent::AdjustLocation(AActor* Part, const UMeshComponent* PartComponen
 
 	const auto NewLocation = UKismetMathLibrary::TransformLocation(
 		ParentTransform, UKismetMathLibrary::NegateVector(InverseTransformLocation));
-	
+
 	Part->SetActorLocation(NewLocation);
 }
 

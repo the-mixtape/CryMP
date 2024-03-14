@@ -24,9 +24,13 @@ class CRYMP_API ACMPCharacter : public ACharacter
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Movement)
 	UCMPCharacterMovementComponent* CMPCharacterMovementComponent;
-	
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Camera)
 	UCameraComponent* FPCamera;
+
+public:
+	UFUNCTION(BlueprintPure, Category=Camera)
+	FORCEINLINE UCameraComponent* GetFPCamera() const { return FPCamera; }
 
 public:
 	ACMPCharacter(const FObjectInitializer& ObjectInitializer);
@@ -61,11 +65,11 @@ private:
 	/** Aim Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* AimAction;
-	
+
 	/** Run Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* RunAction;
-	
+
 	/** Run Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* WalkAction;
@@ -84,7 +88,7 @@ protected:
 	/** Called for sprint input */
 	void AimStarted(const FInputActionValue& Value);
 	void AimFinished(const FInputActionValue& Value);
-	
+
 	/** Called for sprint input */
 	void RunStarted(const FInputActionValue& Value);
 	void RunFinished(const FInputActionValue& Value);
@@ -105,26 +109,27 @@ private:
 #pragma endregion
 
 #pragma region Weapon
+
 public:
 	UPROPERTY(BlueprintReadOnly, Category="Customization|Weapon|Sway")
 	float InputAxisYaw;
-	
+
 	UPROPERTY(BlueprintReadOnly, Category="Customization|Weapon|Sway")
 	float InputAxisPitch;
-	
+
 	UPROPERTY(BlueprintReadOnly, Category="Customization|Weapon|Sway")
 	float InputAxisRight;
 
 	UPROPERTY(BlueprintReadOnly, Category="Customization|Weapon|Aiming")
 	bool bIsHoldToAim = true;
-	
+
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Weapon|Customization")
 	TMap<TSubclassOf<AGunParent>, uint8> StartingGunsInventory;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category="Weapon|Sockets")
 	FName GunHolsterSocketName = "GunHolster";
-	
+
 	UPROPERTY(EditDefaultsOnly, Category="Weapon|Sockets")
 	FName GunSocketName = "Gun";
 
@@ -133,16 +138,24 @@ protected:
 	AGunParent* CurrentWeapon;
 
 public:
+	UFUNCTION(BlueprintPure, Category=Weapon)
+	FORCEINLINE AGunParent* GetCurrentWeapon() const { return CurrentWeapon; }
+
+protected:
 	UPROPERTY(BlueprintReadOnly, Replicated)
 	bool bInterpolateSight;
 	
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_HandTransform)
 	FTransform HandTransform;
+
+public:
+	void SetHandTransform(const FTransform& NewTransform);
+	void SetInterpolateSight(const bool NewInterpolateSight);
 	
 private:
 	UPROPERTY()
 	TArray<AGunParent*> GunsInventory;
-	
+
 	UPROPERTY()
 	bool bIsAiming;
 
@@ -163,23 +176,23 @@ private:
 
 	UFUNCTION(Server, Reliable)
 	void ServerEnterAiming();
-	
+
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastEnterAiming();
 
 	UFUNCTION(Server, Reliable)
 	void ServerExitAiming();
-	
+
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastExitAiming();
-	
+
 public:
 	UFUNCTION(BlueprintCallable)
 	void SwitchWeapon();
 
 	UFUNCTION(BlueprintPure)
 	FORCEINLINE bool IsWeaponEquipped() const { return CurrentWeapon != nullptr; }
-	
+
 private:
 	void SpawnGunsInventory();
 	void AddToGunInventory(AGunParent* Gun);
@@ -190,6 +203,7 @@ private:
 #pragma endregion
 
 #pragma region Animations
+
 protected:
 	UPROPERTY(BlueprintReadOnly, Category=Animactions)
 	UCMPAnimInstance* CMPAnimInstance;
@@ -200,7 +214,7 @@ protected:
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Customization|Sockets")
 	FName RightHandSocketName = "hand_r";
-	
+
 public:
 	FTransform GetRightHandTransform(ERelativeTransformSpace TransformSpace) const;
 };

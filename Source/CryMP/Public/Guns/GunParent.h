@@ -40,19 +40,19 @@ struct FSightData
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	ESightTypes SightType = ESightTypes::EST_IronSight;
-		
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FName OpticOrFrontSocket = "None";
-	
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	UMeshComponent* OpticOrFrontComponent = nullptr;
-	
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FName RearSocket = "None";
-	
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	UMeshComponent* RearComponent = nullptr;
-	
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FTransform HandTransform;
 
@@ -121,7 +121,8 @@ private:
 	void UpdateOpticSightsHandTransform();
 	void UpdateIronSightsHandTransform();
 
-	static FTransform CalculateIronSightTransform(const FVector& FrontLocation, const FVector& RearLocation, const FRotator& RearRotation);
+	static FTransform CalculateIronSightTransform(const FVector& FrontLocation, const FVector& RearLocation,
+	                                              const FRotator& RearRotation);
 
 public:
 	UPROPERTY(BlueprintReadOnly)
@@ -160,15 +161,34 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Category="Sights")
 	TArray<FSightData> Sights;
-	
+
 	UPROPERTY(Replicated, BlueprintReadOnly, Category="Sights")
 	AMagParent* Magazine;
 
 	UPROPERTY(BlueprintReadOnly, Category="Sights")
 	int CurrentSight;
 
+	UPROPERTY(EditDefaultsOnly, Category="Customization|Aiming")
+	float DistanceFromCamera = 0.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Customization|Aiming")
+	float TimeToAim = 0.25f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Customization|Aiming")
+	float TimeFromAim = 0.25f;
+
 	UPROPERTY(EditDefaultsOnly, Replicated, Category="Customization|Aiming")
 	float SightMaxAngle = 50;
+
+public:
+	UFUNCTION(BlueprintPure, Category="Aiming")
+	FORCEINLINE float GetDistanceFromCamera() const { return DistanceFromCamera; }
+
+	UFUNCTION(BlueprintPure, Category="Aiming")
+	FORCEINLINE float GetTimeToAim() const { return TimeToAim; }
+
+	UFUNCTION(BlueprintPure, Category="Aiming")
+	FORCEINLINE float GetTimeFromAim() const { return TimeFromAim; }
 
 private:
 	void ResetGunProperties();
@@ -182,10 +202,10 @@ private:
 	static void AdjustRotation(AActor* Part, const UMeshComponent* PartComponent, const FName& TopSocket);
 	static void AdjustLocation(AActor* Part, const UMeshComponent* PartComponent, const FName& TopSocket,
 	                           const UMeshComponent* ParentMeshComponent, const FName& BaseSocket);
-	
+
 	void GenerateOpticSights(AAssemblableParent* Part);
 	void GenerateIronSights(AAssemblableParent* InPart, const TArray<AAssemblableParent*>& AllParts);
-	
+
 	static bool IronSightsCanBePaired(FName RearSocket, UMeshComponent* RearComp, FName FrontSocket,
 	                                  UMeshComponent* FrontComp);
 

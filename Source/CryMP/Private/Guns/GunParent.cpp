@@ -72,9 +72,8 @@ void AGunParent::CalculateHandTransforms()
 		HandTransform = SightData.HandTransform;
 	}
 
-	CharacterOwner->bInterpolateSight = !bHasSights;
-	CharacterOwner->HandTransform = HandTransform;
-	
+	CharacterOwner->SetInterpolateSight(!bHasSights);
+	CharacterOwner->SetHandTransform(HandTransform);
 }
 
 void AGunParent::SetStartingFireMode()

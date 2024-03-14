@@ -169,6 +169,7 @@ void ACMPCharacter::RunStarted(const FInputActionValue& Value)
 	}
 
 	CMPCharacterMovementComponent->StartRun();
+	ExitAiming();
 }
 
 void ACMPCharacter::RunFinished(const FInputActionValue& Value)
@@ -217,8 +218,22 @@ void ACMPCharacter::JumpReleased(const FInputActionValue& Value)
 	ACharacter::StopJumping();
 }
 
+void ACMPCharacter::SetHandTransform(const FTransform& NewTransform)
+{
+	HandTransform = NewTransform;
+
+	if(HasAuthority()) OnRep_HandTransform();
+}
+
+void ACMPCharacter::SetInterpolateSight(const bool NewInterpolateSight)
+{
+	bInterpolateSight = NewInterpolateSight;
+}
+
 void ACMPCharacter::SetIsAiming(bool InIsAiming)
 {
+	if(!CurrentWeapon) return;
+	
 	bIsAiming = InIsAiming;
 	CurrentWeapon->bIsAiming = bIsAiming;
 
@@ -264,7 +279,7 @@ void ACMPCharacter::EnterAiming()
 	if (!AnimInstance) return;
 
 	if (CMPCharacterMovementComponent->IsFalling() ||
-		CMPCharacterMovementComponent->GetCustomMovementState() == ECustomMovementState::ECMS_Run ||
+		// CMPCharacterMovementComponent->GetCustomMovementState() == ECustomMovementState::ECMS_Run ||
 		AnimInstance->IsPlayingSlotAnimation(AnimInstance->UnEquipSequence, AnimInstance->EquipAnimSlotName) ||
 		AnimInstance->IsPlayingSlotAnimation(AnimInstance->EquipSequence, AnimInstance->EquipAnimSlotName))
 		return;
@@ -341,10 +356,7 @@ void ACMPCharacter::SpawnGunsInventory()
 		if (const auto FirstGun = *GunsInventory.GetData())
 		{
 			CurrentWeapon = FirstGun;
-			if (GetNetMode() == NM_ListenServer)
-			{
-				OnRep_CurrentWeapon();
-			}
+			OnRep_CurrentWeapon();
 		}
 	}
 }

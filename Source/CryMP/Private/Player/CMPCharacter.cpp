@@ -169,7 +169,7 @@ void ACMPCharacter::RunStarted(const FInputActionValue& Value)
 	}
 
 	CMPCharacterMovementComponent->StartRun();
-	ExitAiming();
+	if (bIsAiming) ExitAiming();
 }
 
 void ACMPCharacter::RunFinished(const FInputActionValue& Value)
@@ -184,6 +184,8 @@ void ACMPCharacter::WalkStarted(const FInputActionValue& Value)
 	if (!Controller) return;
 
 	bIsWalkPressed = true;
+	if(bIsAiming) return;
+
 	CMPCharacterMovementComponent->StartWalk();
 }
 
@@ -192,6 +194,8 @@ void ACMPCharacter::WalkFinished(const FInputActionValue& Value)
 	if (!Controller) return;
 
 	bIsWalkPressed = false;
+	if(bIsAiming) return;
+	
 	CMPCharacterMovementComponent->StopWalk();
 }
 
@@ -222,7 +226,7 @@ void ACMPCharacter::SetHandTransform(const FTransform& NewTransform)
 {
 	HandTransform = NewTransform;
 
-	if(HasAuthority()) OnRep_HandTransform();
+	if (HasAuthority()) OnRep_HandTransform();
 }
 
 void ACMPCharacter::SetInterpolateSight(const bool NewInterpolateSight)
@@ -232,20 +236,21 @@ void ACMPCharacter::SetInterpolateSight(const bool NewInterpolateSight)
 
 void ACMPCharacter::SetIsAiming(bool InIsAiming)
 {
-	if(!CurrentWeapon) return;
-	
+	if (!CurrentWeapon) return;
+
 	bIsAiming = InIsAiming;
 	CurrentWeapon->bIsAiming = bIsAiming;
 
-	const auto AnimInstance = GetAnimInstance();
-	if(!AnimInstance) return;
-	AnimInstance->bIsAiming = bIsAiming;
+	if (const auto AnimInstance = GetAnimInstance())
+	{
+		AnimInstance->bIsAiming = bIsAiming;
+	}
 
-	if(bIsAiming)
+	if (bIsAiming)
 	{
 		CMPCharacterMovementComponent->StartWalk();
 	}
-	else if(!bIsWalkPressed)
+	else if (!bIsWalkPressed)
 	{
 		CMPCharacterMovementComponent->StopWalk();
 	}
@@ -313,8 +318,8 @@ void ACMPCharacter::ServerExitAiming_Implementation()
 
 void ACMPCharacter::MulticastExitAiming_Implementation()
 {
-	if(IsLocallyControlled()) return;
-	
+	if (IsLocallyControlled()) return;
+
 	SetIsAiming(false);
 }
 
@@ -342,7 +347,7 @@ void ACMPCharacter::SpawnGunsInventory()
 			Params.Owner = this;
 			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 			Params.TransformScaleMethod = ESpawnActorScaleMethod::SelectDefaultAtRuntime;
-			
+
 			if (const auto Gun = GetWorld()->SpawnActor<AGunParent>(
 				GunClass.Get(), FVector::ZeroVector, FRotator::ZeroRotator, Params))
 			{

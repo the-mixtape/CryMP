@@ -7,11 +7,35 @@
 #include "CMPCharacterMovementComponent.generated.h"
 
 UENUM(BlueprintType)
-enum class ECustomMovementState : uint8
+enum class EGaits : uint8
 {
 	ECMS_Walk UMETA(DisplayName = "Walk"),
 	ECMS_Jog UMETA(DisplayName = "Jog"),
 	ECMS_Run UMETA(DisplayName = "Run")
+};
+
+USTRUCT(BlueprintType)
+struct FGaitSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MaxWalkSpeed;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MaxAcceleration;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float BrakingDeceleration;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float BrakingFrictionFactor;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float BrakingFriction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bUseSeparateBrakingFriction;
 };
 
 
@@ -55,20 +79,20 @@ class CRYMP_API UCMPCharacterMovementComponent : public UCharacterMovementCompon
 	bool Safe_bWantsToWalk;
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings|Speed")
-	float Run_MaxWalkSpeed = 480.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings")
+	FGaitSettings RunSettings;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings|Speed")
-	float Jog_MaxWalkSpeed = 240.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings")
+	FGaitSettings JogSettings;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings|Speed")
-	float Walk_MaxWalkSpeed = 120.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings")
+	FGaitSettings WalkSettings;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings")
 	float Run_Angle = 60.f;
 
 	UPROPERTY(Replicated)
-	ECustomMovementState CurrentMovementState;
+	EGaits CurrentGait;
 
 public:
 	UCMPCharacterMovementComponent();
@@ -79,7 +103,8 @@ public:
 protected:
 	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
 	virtual void OnMovementUpdated(float DeltaSeconds, const FVector& OldLocation, const FVector& OldVelocity) override;
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
+	                           FActorComponentTickFunction* ThisTickFunction) override;
 
 	void ReplicateMovementState();
 
@@ -100,10 +125,20 @@ public:
 	void StartCrouch();
 	UFUNCTION(BlueprintCallable)
 	void StopCrouch();
-	
+
 	UFUNCTION(BlueprintPure)
-	FORCEINLINE ECustomMovementState GetCustomMovementState() const
+	FORCEINLINE EGaits GetCurrentGait() const
 	{
-		return CurrentMovementState;
+		return CurrentGait;
+	}
+
+	FORCEINLINE void UseGaitSettings(const FGaitSettings& Settings)
+	{
+		MaxWalkSpeed = Settings.MaxWalkSpeed;
+		MaxAcceleration = Settings.MaxAcceleration;
+		BrakingDecelerationWalking = Settings.BrakingDeceleration;
+		BrakingFrictionFactor = Settings.BrakingFrictionFactor;
+		bUseSeparateBrakingFriction = Settings.bUseSeparateBrakingFriction;
+		BrakingFriction = Settings.BrakingFriction;
 	}
 };

@@ -104,7 +104,7 @@ void UCMPCharacterMovementComponent::GetLifetimeReplicatedProps(TArray<FLifetime
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(UCMPCharacterMovementComponent, CurrentMovementState);
+	DOREPLIFETIME(UCMPCharacterMovementComponent, CurrentGait);
 }
 
 void UCMPCharacterMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
@@ -128,15 +128,15 @@ void UCMPCharacterMovementComponent::OnMovementUpdated(float DeltaSeconds, const
 
 		if (Safe_bWantsToRun && AbsMoveAngle <= Run_Angle)
 		{
-			MaxWalkSpeed = Run_MaxWalkSpeed;
+			UseGaitSettings(RunSettings);
 		}
 		else if (Safe_bWantsToWalk)
 		{
-			MaxWalkSpeed = Walk_MaxWalkSpeed;
+			UseGaitSettings(WalkSettings);
 		}
 		else
 		{
-			MaxWalkSpeed = Jog_MaxWalkSpeed;
+			UseGaitSettings(JogSettings);
 		}
 	}
 }
@@ -154,9 +154,9 @@ void UCMPCharacterMovementComponent::ReplicateMovementState()
 	if (!GetOwner()->HasAuthority()) return;
 	if (MovementMode != MOVE_Walking) return;
 
-	if (MaxWalkSpeed == Run_MaxWalkSpeed) CurrentMovementState = ECustomMovementState::ECMS_Run;
-	else if (MaxWalkSpeed == Walk_MaxWalkSpeed) CurrentMovementState = ECustomMovementState::ECMS_Walk;
-	else CurrentMovementState = ECustomMovementState::ECMS_Jog;
+	if (FMath::IsNearlyEqual(MaxWalkSpeed, RunSettings.MaxWalkSpeed, 0.001f)) CurrentGait = EGaits::ECMS_Run;
+	else if (FMath::IsNearlyEqual(MaxWalkSpeed, WalkSettings.MaxWalkSpeed, 0.001f)) CurrentGait = EGaits::ECMS_Walk;
+	else CurrentGait = EGaits::ECMS_Jog;
 }
 
 void UCMPCharacterMovementComponent::StartRun()

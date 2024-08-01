@@ -90,10 +90,15 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings")
 	float Run_Angle = 60.f;
-
+	
 	UPROPERTY(Replicated)
 	EGaits CurrentGait;
 
+private:
+	EGaits TargetGait;
+	bool bGaitApplied = false;
+	bool bIsAccelerating;
+	
 public:
 	UCMPCharacterMovementComponent();
 
@@ -132,6 +137,46 @@ public:
 		return CurrentGait;
 	}
 
+	FORCEINLINE void SetTargetGait(EGaits InTargetGait, const FGaitSettings& Settings)
+	{
+		if(TargetGait != InTargetGait)
+		{
+			TargetGait = InTargetGait;
+			MaxWalkSpeed = Settings.MaxWalkSpeed;
+			bGaitApplied = false;
+		}
+	}
+
+	FORCEINLINE void ApplyGaitSettings()
+	{
+		if(bGaitApplied) return;
+		
+		const float GroundSpeed = Velocity.Size2D();
+
+		const FGaitSettings* TargetSettings = nullptr;
+		switch (TargetGait)
+		{
+		case EGaits::ECMS_Run:
+			TargetSettings = &RunSettings;
+			break;
+		case EGaits::ECMS_Jog:
+			TargetSettings = &JogSettings;
+			break;
+		case EGaits::ECMS_Walk:
+			TargetSettings = &WalkSettings;
+			break;
+		}
+
+		check(TargetSettings);
+		
+		if(bIsAccelerating && GroundSpeed <= TargetSettings->MaxWalkSpeed)
+		{
+			UseGaitSettings(*TargetSettings);
+		}
+		
+		bGaitApplied = true;
+	}
+	
 	FORCEINLINE void UseGaitSettings(const FGaitSettings& Settings)
 	{
 		MaxWalkSpeed = Settings.MaxWalkSpeed;

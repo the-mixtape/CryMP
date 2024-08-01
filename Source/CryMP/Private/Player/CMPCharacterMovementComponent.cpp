@@ -120,6 +120,8 @@ void UCMPCharacterMovementComponent::OnMovementUpdated(float DeltaSeconds, const
 {
 	Super::OnMovementUpdated(DeltaSeconds, OldLocation, OldVelocity);
 
+	bIsAccelerating = Velocity.Size() > OldVelocity.Size();
+	
 	if (MovementMode == MOVE_Walking)
 	{
 		const auto MoveAngle =
@@ -128,16 +130,19 @@ void UCMPCharacterMovementComponent::OnMovementUpdated(float DeltaSeconds, const
 
 		if (Safe_bWantsToRun && AbsMoveAngle <= Run_Angle)
 		{
-			UseGaitSettings(RunSettings);
+			SetTargetGait(EGaits::ECMS_Run, RunSettings);
+			
 		}
 		else if (Safe_bWantsToWalk)
 		{
-			UseGaitSettings(WalkSettings);
+			SetTargetGait(EGaits::ECMS_Walk, WalkSettings);
 		}
 		else
 		{
-			UseGaitSettings(JogSettings);
+			SetTargetGait(EGaits::ECMS_Jog, JogSettings);
 		}
+		
+		ApplyGaitSettings();
 	}
 }
 

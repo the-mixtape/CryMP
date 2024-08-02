@@ -20,6 +20,7 @@ ACMPCharacter::ACMPCharacter(const FObjectInitializer& ObjectInitializer)
 
 	GetCharacterMovement()->SetIsReplicated(true);
 	CMPCharacterMovementComponent = Cast<UCMPCharacterMovementComponent>(GetCharacterMovement());
+	CMPCharacterMovementComponent->bAllowPhysicsRotationDuringAnimRootMotion = false;
 
 	FPCamera = CreateDefaultSubobject<UCameraComponent>("FPCamera");
 	FPCamera->SetupAttachment(GetMesh(), "CameraSocket");
@@ -52,6 +53,26 @@ void ACMPCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(ACMPCharacter, CurrentWeapon);
 	DOREPLIFETIME(ACMPCharacter, HandTransform);
 	DOREPLIFETIME(ACMPCharacter, bInterpolateSight);
+	DOREPLIFETIME_CONDITION(ThisClass, ReplicatedAcceleration, COND_SimulatedOnly);
+}
+
+void ACMPCharacter::PreReplication(IRepChangedPropertyTracker& ChangedPropertyTracker)
+{
+	Super::PreReplication(ChangedPropertyTracker);
+
+	if (CMPCharacterMovementComponent)
+	{
+		// Compress Acceleration: XY components as direction + magnitude, Z component as direct value
+		const double MaxAccel = CMPCharacterMovementComponent->MaxAcceleration;
+		const FVector CurrentAccel = CMPCharacterMovementComponent->GetCurrentAcceleration();
+		double AccelXYRadians, AccelXYMagnitude;
+		FMath::CartesianToPolar(CurrentAccel.X, CurrentAccel.Y, AccelXYMagnitude, AccelXYRadians);
+
+		ReplicatedAcceleration.AccelXYRadians   = FMath::FloorToInt((AccelXYRadians / TWO_PI) * 255.0);     // [0, 2PI] -> [0, 255]
+		ReplicatedAcceleration.AccelXYMagnitude = FMath::FloorToInt((AccelXYMagnitude / MaxAccel) * 255.0);	// [0, MaxAccel] -> [0, 255]
+		ReplicatedAcceleration.AccelZ           = FMath::FloorToInt((CurrentAccel.Z / MaxAccel) * 127.0);   // [-MaxAccel, MaxAccel] -> [-127, 127]
+	}
+	
 }
 
 void ACMPCharacter::Tick(float DeltaTime)
@@ -434,4 +455,20 @@ UCMPAnimInstance* ACMPCharacter::GetAnimInstance()
 FTransform ACMPCharacter::GetRightHandTransform(ERelativeTransformSpace TransformSpace) const
 {
 	return GetMesh()->GetSocketTransform(RightHandSocketName, TransformSpace);
+}
+
+void ACMPCharacter::OnRep_ReplicatedAcceleration()
+{
+	if (!CMPCharacterMovementComponent) return;
+	
+	// Decompress Acceleration
+	const double MaxAccel         = CMPCharacterMovementComponent->MaxAcceleration;
+	const double AccelXYMagnitude = double(ReplicatedAcceleration.AccelXYMagnitude) * MaxAccel / 255.0; // [0, 255] -> [0, MaxAccel]
+	const double AccelXYRadians   = double(ReplicatedAcceleration.AccelXYRadians) * TWO_PI / 255.0;     // [0, 255] -> [0, 2PI]
+
+	FVector UnpackedAcceleration(FVector::ZeroVector);
+	FMath::PolarToCartesian(AccelXYMagnitude, AccelXYRadians, UnpackedAcceleration.X, UnpackedAcceleration.Y);
+	UnpackedAcceleration.Z = double(ReplicatedAcceleration.AccelZ) * MaxAccel / 127.0; // [-127, 127] -> [-MaxAccel, MaxAccel]
+
+	CMPCharacterMovementComponent->SetReplicatedAcceleration(UnpackedAcceleration);
 }

@@ -90,17 +90,21 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings")
 	float Run_Angle = 60.f;
-	
-	UPROPERTY(Replicated)
+
+	UPROPERTY(ReplicatedUsing=OnRep_CurrentGait)
 	EGaits CurrentGait;
 
 private:
 	EGaits TargetGait;
 	bool bGaitApplied = false;
 	bool bIsAccelerating;
-	
+
 public:
 	UCMPCharacterMovementComponent();
+	
+	virtual void SimulateMovement(float DeltaTime) override;
+
+	virtual void InitializeComponent() override;
 
 	virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -130,6 +134,16 @@ public:
 	void StartCrouch();
 	UFUNCTION(BlueprintCallable)
 	void StopCrouch();
+	
+	void SetReplicatedAcceleration(const FVector& InAcceleration);
+
+protected:
+	UPROPERTY(Transient)
+	bool bHasReplicatedAcceleration = false;
+	
+private:
+	UFUNCTION()
+	void OnRep_CurrentGait();
 
 	UFUNCTION(BlueprintPure)
 	FORCEINLINE EGaits GetCurrentGait() const
@@ -139,7 +153,7 @@ public:
 
 	FORCEINLINE void SetTargetGait(EGaits InTargetGait, const FGaitSettings& Settings)
 	{
-		if(TargetGait != InTargetGait)
+		if (TargetGait != InTargetGait)
 		{
 			TargetGait = InTargetGait;
 			MaxWalkSpeed = Settings.MaxWalkSpeed;
@@ -149,34 +163,19 @@ public:
 
 	FORCEINLINE void ApplyGaitSettings()
 	{
-		if(bGaitApplied) return;
-		
+		if (bGaitApplied) return;
+
 		const float GroundSpeed = Velocity.Size2D();
-
-		const FGaitSettings* TargetSettings = nullptr;
-		switch (TargetGait)
+		
+		const auto TargetSettings = GetGaitSettings(TargetGait);
+		if (bIsAccelerating && GroundSpeed <= TargetSettings.MaxWalkSpeed)
 		{
-		case EGaits::ECMS_Run:
-			TargetSettings = &RunSettings;
-			break;
-		case EGaits::ECMS_Jog:
-			TargetSettings = &JogSettings;
-			break;
-		case EGaits::ECMS_Walk:
-			TargetSettings = &WalkSettings;
-			break;
+			UseGaitSettings(TargetSettings);
 		}
 
-		check(TargetSettings);
-		
-		if(bIsAccelerating && GroundSpeed <= TargetSettings->MaxWalkSpeed)
-		{
-			UseGaitSettings(*TargetSettings);
-		}
-		
 		bGaitApplied = true;
 	}
-	
+
 	FORCEINLINE void UseGaitSettings(const FGaitSettings& Settings)
 	{
 		MaxWalkSpeed = Settings.MaxWalkSpeed;
@@ -185,5 +184,18 @@ public:
 		BrakingFrictionFactor = Settings.BrakingFrictionFactor;
 		bUseSeparateBrakingFriction = Settings.bUseSeparateBrakingFriction;
 		BrakingFriction = Settings.BrakingFriction;
+	}
+
+	FORCEINLINE const FGaitSettings& GetGaitSettings(EGaits Gait) const
+	{
+		switch (Gait)
+		{
+		case EGaits::ECMS_Run: return RunSettings;
+		case EGaits::ECMS_Jog: return JogSettings;
+		case EGaits::ECMS_Walk: return WalkSettings;
+		default:
+			checkf(false, TEXT("Unknown Gait type."));
+			return JogSettings;
+		}
 	}
 };

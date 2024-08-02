@@ -15,6 +15,23 @@ class UInputAction;
 class AGunParent;
 class AGunPartParent;
 
+/**
+ * FCMPReplicatedAcceleration: Compressed representation of acceleration
+ */
+USTRUCT()
+struct FCMPReplicatedAcceleration
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	uint8 AccelXYRadians = 0;	// Direction of XY accel component, quantized to represent [0, 2*pi]
+
+	UPROPERTY()
+	uint8 AccelXYMagnitude = 0;	//Accel rate of XY component, quantized to represent [0, MaxAcceleration]
+
+	UPROPERTY()
+	int8 AccelZ = 0;	// Raw Z accel rate component, quantized to represent [-MaxAcceleration, MaxAcceleration]
+};
 
 UCLASS()
 class CRYMP_API ACMPCharacter : public ACharacter
@@ -38,6 +55,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void PreReplication(IRepChangedPropertyTracker& ChangedPropertyTracker) override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
@@ -217,4 +235,12 @@ protected:
 
 public:
 	FTransform GetRightHandTransform(ERelativeTransformSpace TransformSpace) const;
+
+private:
+	UPROPERTY(Transient, ReplicatedUsing = OnRep_ReplicatedAcceleration)
+	FCMPReplicatedAcceleration ReplicatedAcceleration;
+
+private:
+	UFUNCTION()
+	void OnRep_ReplicatedAcceleration();
 };

@@ -82,6 +82,30 @@ FSavedMovePtr UCMPCharacterMovementComponent::FNetworkPredictionData_Client_CMP:
 UCMPCharacterMovementComponent::UCMPCharacterMovementComponent()
 {
 	NavAgentProps.bCanCrouch = true;
+	SetIsReplicatedByDefault(true);
+}
+
+void UCMPCharacterMovementComponent::SimulateMovement(float DeltaTime)
+{
+	if (bHasReplicatedAcceleration)
+	{
+		// Preserve our replicated acceleration
+		const FVector OriginalAcceleration = Acceleration;
+		Super::SimulateMovement(DeltaTime);
+		Acceleration = OriginalAcceleration;
+	}
+	else
+	{
+		Super::SimulateMovement(DeltaTime);
+	}
+}
+
+void UCMPCharacterMovementComponent::InitializeComponent()
+{
+	Super::InitializeComponent();
+
+	SetTargetGait(EGaits::ECMS_Jog, JogSettings);
+	UseGaitSettings(JogSettings);
 }
 
 FNetworkPredictionData_Client* UCMPCharacterMovementComponent::GetPredictionData_Client() const
@@ -200,5 +224,17 @@ void UCMPCharacterMovementComponent::StartCrouch()
 void UCMPCharacterMovementComponent::StopCrouch()
 {
 	bWantsToCrouch = false;
+}
+
+void UCMPCharacterMovementComponent::SetReplicatedAcceleration(const FVector& InAcceleration)
+{
+	bHasReplicatedAcceleration = true;
+	Acceleration = InAcceleration;
+}
+
+void UCMPCharacterMovementComponent::OnRep_CurrentGait()
+{
+	const auto TargetSettings = GetGaitSettings(CurrentGait);
+	SetTargetGait(CurrentGait, TargetSettings);
 }
 #pragma endregion

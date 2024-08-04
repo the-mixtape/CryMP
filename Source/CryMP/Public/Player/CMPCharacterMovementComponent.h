@@ -10,8 +10,7 @@ UENUM(BlueprintType)
 enum class EGaits : uint8
 {
 	ECMS_Walk UMETA(DisplayName = "Walk"),
-	ECMS_Jog UMETA(DisplayName = "Jog"),
-	ECMS_Run UMETA(DisplayName = "Run")
+	ECMS_Jog UMETA(DisplayName = "Jog")
 };
 
 USTRUCT(BlueprintType)
@@ -50,8 +49,7 @@ class CRYMP_API UCMPCharacterMovementComponent : public UCharacterMovementCompon
 	{
 		typedef FSavedMove_Character Super;
 
-		uint8 Saved_bWantsToRun:1;
-		uint8 Saved_bWantsToWalk:1;
+		uint8 Saved_bWantsToJog:1;
 
 	public:
 		FSavedMove_CMP();
@@ -75,13 +73,10 @@ class CRYMP_API UCMPCharacterMovementComponent : public UCharacterMovementCompon
 		virtual FSavedMovePtr AllocateNewMove() override;
 	};
 
-	bool Safe_bWantsToRun;
-	bool Safe_bWantsToWalk;
+	UPROPERTY(Replicated)
+	bool Safe_bWantsToJog;
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings")
-	FGaitSettings RunSettings;
-
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings")
 	FGaitSettings JogSettings;
 
@@ -89,23 +84,15 @@ protected:
 	FGaitSettings WalkSettings;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings")
-	float Run_Angle = 60.f;
+	float Jog_Angle = 60.f;
 
-	UPROPERTY(ReplicatedUsing=OnRep_CurrentGait)
 	EGaits CurrentGait;
-
-private:
-	EGaits TargetGait;
-	bool bGaitApplied = false;
-	bool bIsAccelerating;
 
 public:
 	UCMPCharacterMovementComponent();
-	
-	virtual void SimulateMovement(float DeltaTime) override;
 
 	virtual void InitializeComponent() override;
-
+	virtual void SimulateMovement(float DeltaTime) override;
 	virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -115,87 +102,41 @@ protected:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
 	                           FActorComponentTickFunction* ThisTickFunction) override;
 
-	void ReplicateMovementState();
-
 public:
 	UFUNCTION(BlueprintCallable)
-	void StartRun();
+	void StartJog();
 	UFUNCTION(BlueprintCallable)
-	void StopRun();
-
-	UFUNCTION(BlueprintCallable)
-	void StartWalk();
-	UFUNCTION(BlueprintCallable)
-	void StopWalk();
-
+	void StopJog();
+	
 	UFUNCTION(BlueprintCallable)
 	void ToggleCrouch();
 	UFUNCTION(BlueprintCallable)
 	void StartCrouch();
 	UFUNCTION(BlueprintCallable)
 	void StopCrouch();
-	
+
 	void SetReplicatedAcceleration(const FVector& InAcceleration);
 
 protected:
 	UPROPERTY(Transient)
 	bool bHasReplicatedAcceleration = false;
-	
+
 private:
-	UFUNCTION()
-	void OnRep_CurrentGait();
+	void SetWantToJog(bool Value);
+
+	UFUNCTION(Server, Reliable)
+	void ServerSetWantToJog(bool Value);
 
 	UFUNCTION(BlueprintPure)
-	FORCEINLINE EGaits GetCurrentGait() const
-	{
-		return CurrentGait;
-	}
-
-	FORCEINLINE void SetTargetGait(EGaits InTargetGait, const FGaitSettings& Settings)
-	{
-		if (TargetGait != InTargetGait)
-		{
-			TargetGait = InTargetGait;
-			MaxWalkSpeed = Settings.MaxWalkSpeed;
-			bGaitApplied = false;
-		}
-	}
-
-	FORCEINLINE void ApplyGaitSettings()
-	{
-		if (bGaitApplied) return;
-
-		const float GroundSpeed = Velocity.Size2D();
-		
-		const auto TargetSettings = GetGaitSettings(TargetGait);
-		if (bIsAccelerating && GroundSpeed <= TargetSettings.MaxWalkSpeed)
-		{
-			UseGaitSettings(TargetSettings);
-		}
-
-		bGaitApplied = true;
-	}
+	FORCEINLINE EGaits GetCurrentGait() const { return CurrentGait; }
 
 	FORCEINLINE void UseGaitSettings(const FGaitSettings& Settings)
 	{
 		MaxWalkSpeed = Settings.MaxWalkSpeed;
-		MaxAcceleration = Settings.MaxAcceleration;
-		BrakingDecelerationWalking = Settings.BrakingDeceleration;
 		BrakingFrictionFactor = Settings.BrakingFrictionFactor;
 		bUseSeparateBrakingFriction = Settings.bUseSeparateBrakingFriction;
 		BrakingFriction = Settings.BrakingFriction;
-	}
-
-	FORCEINLINE const FGaitSettings& GetGaitSettings(EGaits Gait) const
-	{
-		switch (Gait)
-		{
-		case EGaits::ECMS_Run: return RunSettings;
-		case EGaits::ECMS_Jog: return JogSettings;
-		case EGaits::ECMS_Walk: return WalkSettings;
-		default:
-			checkf(false, TEXT("Unknown Gait type."));
-			return JogSettings;
-		}
+		MaxAcceleration = Settings.MaxAcceleration;
+		BrakingDecelerationWalking = Settings.BrakingDeceleration;
 	}
 };

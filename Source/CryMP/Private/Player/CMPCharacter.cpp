@@ -12,6 +12,97 @@
 #include "Player/CMPCharacterMovementComponent.h"
 
 
+FSharedRepMovement::FSharedRepMovement()
+{
+	RepMovement.LocationQuantizationLevel = EVectorQuantization::RoundTwoDecimals;
+}
+
+bool FSharedRepMovement::FillForCharacter(ACharacter* Character)
+{
+	if (USceneComponent* PawnRootComponent = Character->GetRootComponent())
+	{
+		UCharacterMovementComponent* CharacterMovement = Character->GetCharacterMovement();
+
+		RepMovement.Location = FRepMovement::RebaseOntoZeroOrigin(PawnRootComponent->GetComponentLocation(), Character);
+		RepMovement.Rotation = PawnRootComponent->GetComponentRotation();
+		RepMovement.LinearVelocity = CharacterMovement->Velocity;
+		RepMovementMode = CharacterMovement->PackNetworkMovementMode();
+		bProxyIsJumpForceApplied = Character->bProxyIsJumpForceApplied || (Character->JumpForceTimeRemaining > 0.0f);
+		bIsCrouched = Character->bIsCrouched;
+
+		// Timestamp is sent as zero if unused
+		if ((CharacterMovement->NetworkSmoothingMode == ENetworkSmoothingMode::Linear) || CharacterMovement->bNetworkAlwaysReplicateTransformUpdateTimestamp)
+		{
+			RepTimeStamp = CharacterMovement->GetServerLastTransformUpdateTimeStamp();
+		}
+		else
+		{
+			RepTimeStamp = 0.f;
+		}
+
+		return true;
+	}
+	return false;
+}
+
+bool FSharedRepMovement::Equals(const FSharedRepMovement& Other, ACharacter* Character) const
+{
+	if (RepMovement.Location != Other.RepMovement.Location)
+	{
+		return false;
+	}
+
+	if (RepMovement.Rotation != Other.RepMovement.Rotation)
+	{
+		return false;
+	}
+
+	if (RepMovement.LinearVelocity != Other.RepMovement.LinearVelocity)
+	{
+		return false;
+	}
+
+	if (RepMovementMode != Other.RepMovementMode)
+	{
+		return false;
+	}
+
+	if (bProxyIsJumpForceApplied != Other.bProxyIsJumpForceApplied)
+	{
+		return false;
+	}
+
+	if (bIsCrouched != Other.bIsCrouched)
+	{
+		return false;
+	}
+
+	return true;
+}
+
+bool FSharedRepMovement::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess)
+{
+	bOutSuccess = true;
+	RepMovement.NetSerialize(Ar, Map, bOutSuccess);
+	Ar << RepMovementMode;
+	Ar << bProxyIsJumpForceApplied;
+	Ar << bIsCrouched;
+
+	// Timestamp, if non-zero.
+	uint8 bHasTimeStamp = (RepTimeStamp != 0.f);
+	Ar.SerializeBits(&bHasTimeStamp, 1);
+	if (bHasTimeStamp)
+	{
+		Ar << RepTimeStamp;
+	}
+	else
+	{
+		RepTimeStamp = 0.f;
+	}
+
+	return true;
+}
+
 ACMPCharacter::ACMPCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<UCMPCharacterMovementComponent>(CharacterMovementComponentName))
 {
@@ -21,6 +112,7 @@ ACMPCharacter::ACMPCharacter(const FObjectInitializer& ObjectInitializer)
 	GetCharacterMovement()->SetIsReplicated(true);
 	CMPCharacterMovementComponent = Cast<UCMPCharacterMovementComponent>(GetCharacterMovement());
 	CMPCharacterMovementComponent->bAllowPhysicsRotationDuringAnimRootMotion = false;
+	CMPCharacterMovementComponent->SetIsReplicated(true);
 
 	FPCamera = CreateDefaultSubobject<UCameraComponent>("FPCamera");
 	FPCamera->SetupAttachment(GetMesh(), "CameraSocket");
@@ -68,11 +160,13 @@ void ACMPCharacter::PreReplication(IRepChangedPropertyTracker& ChangedPropertyTr
 		double AccelXYRadians, AccelXYMagnitude;
 		FMath::CartesianToPolar(CurrentAccel.X, CurrentAccel.Y, AccelXYMagnitude, AccelXYRadians);
 
-		ReplicatedAcceleration.AccelXYRadians   = FMath::FloorToInt((AccelXYRadians / TWO_PI) * 255.0);     // [0, 2PI] -> [0, 255]
-		ReplicatedAcceleration.AccelXYMagnitude = FMath::FloorToInt((AccelXYMagnitude / MaxAccel) * 255.0);	// [0, MaxAccel] -> [0, 255]
-		ReplicatedAcceleration.AccelZ           = FMath::FloorToInt((CurrentAccel.Z / MaxAccel) * 127.0);   // [-MaxAccel, MaxAccel] -> [-127, 127]
+		ReplicatedAcceleration.AccelXYRadians = FMath::FloorToInt((AccelXYRadians / TWO_PI) * 255.0);
+		// [0, 2PI] -> [0, 255]
+		ReplicatedAcceleration.AccelXYMagnitude = FMath::FloorToInt((AccelXYMagnitude / MaxAccel) * 255.0);
+		// [0, MaxAccel] -> [0, 255]
+		ReplicatedAcceleration.AccelZ = FMath::FloorToInt((CurrentAccel.Z / MaxAccel) * 127.0);
+		// [-MaxAccel, MaxAccel] -> [-127, 127]
 	}
-	
 }
 
 void ACMPCharacter::Tick(float DeltaTime)
@@ -100,13 +194,9 @@ void ACMPCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 		EnhancedInputComponent->BindAction(AimAction, ETriggerEvent::Canceled, this, &ACMPCharacter::AimFinished);
 		EnhancedInputComponent->BindAction(AimAction, ETriggerEvent::Completed, this, &ACMPCharacter::AimFinished);
 
-		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Started, this, &ACMPCharacter::RunStarted);
-		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Canceled, this, &ACMPCharacter::RunFinished);
-		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Completed, this, &ACMPCharacter::RunFinished);
-
-		EnhancedInputComponent->BindAction(WalkAction, ETriggerEvent::Started, this, &ACMPCharacter::WalkStarted);
-		EnhancedInputComponent->BindAction(WalkAction, ETriggerEvent::Canceled, this, &ACMPCharacter::WalkFinished);
-		EnhancedInputComponent->BindAction(WalkAction, ETriggerEvent::Completed, this, &ACMPCharacter::WalkFinished);
+		EnhancedInputComponent->BindAction(JogAction, ETriggerEvent::Started, this, &ACMPCharacter::JogStarted);
+		EnhancedInputComponent->BindAction(JogAction, ETriggerEvent::Canceled, this, &ACMPCharacter::JogFinished);
+		EnhancedInputComponent->BindAction(JogAction, ETriggerEvent::Completed, this, &ACMPCharacter::JogFinished);
 
 		EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Started, this,
 		                                   &ACMPCharacter::CrouchPressed);
@@ -179,7 +269,7 @@ void ACMPCharacter::AimFinished(const FInputActionValue& Value)
 	}
 }
 
-void ACMPCharacter::RunStarted(const FInputActionValue& Value)
+void ACMPCharacter::JogStarted(const FInputActionValue& Value)
 {
 	if (!Controller) return;
 
@@ -189,35 +279,15 @@ void ACMPCharacter::RunStarted(const FInputActionValue& Value)
 		return;
 	}
 
-	CMPCharacterMovementComponent->StartRun();
+	CMPCharacterMovementComponent->StartJog();
 	if (bIsAiming) ExitAiming();
 }
 
-void ACMPCharacter::RunFinished(const FInputActionValue& Value)
+void ACMPCharacter::JogFinished(const FInputActionValue& Value)
 {
 	if (!Controller) return;
 
-	CMPCharacterMovementComponent->StopRun();
-}
-
-void ACMPCharacter::WalkStarted(const FInputActionValue& Value)
-{
-	if (!Controller) return;
-
-	bIsWalkPressed = true;
-	if(bIsAiming) return;
-
-	CMPCharacterMovementComponent->StartWalk();
-}
-
-void ACMPCharacter::WalkFinished(const FInputActionValue& Value)
-{
-	if (!Controller) return;
-
-	bIsWalkPressed = false;
-	if(bIsAiming) return;
-	
-	CMPCharacterMovementComponent->StopWalk();
+	CMPCharacterMovementComponent->StopJog();
 }
 
 void ACMPCharacter::CrouchPressed(const FInputActionValue& Value)
@@ -269,11 +339,11 @@ void ACMPCharacter::SetIsAiming(bool InIsAiming)
 
 	if (bIsAiming)
 	{
-		CMPCharacterMovementComponent->StartWalk();
+		CMPCharacterMovementComponent->StopJog();
 	}
 	else if (!bIsWalkPressed)
 	{
-		CMPCharacterMovementComponent->StopWalk();
+		// CMPCharacterMovementComponent->StopWalk();
 	}
 }
 
@@ -460,15 +530,84 @@ FTransform ACMPCharacter::GetRightHandTransform(ERelativeTransformSpace Transfor
 void ACMPCharacter::OnRep_ReplicatedAcceleration()
 {
 	if (!CMPCharacterMovementComponent) return;
-	
+
 	// Decompress Acceleration
-	const double MaxAccel         = CMPCharacterMovementComponent->MaxAcceleration;
-	const double AccelXYMagnitude = double(ReplicatedAcceleration.AccelXYMagnitude) * MaxAccel / 255.0; // [0, 255] -> [0, MaxAccel]
-	const double AccelXYRadians   = double(ReplicatedAcceleration.AccelXYRadians) * TWO_PI / 255.0;     // [0, 255] -> [0, 2PI]
+	const double MaxAccel = CMPCharacterMovementComponent->MaxAcceleration;
+	const double AccelXYMagnitude = double(ReplicatedAcceleration.AccelXYMagnitude) * MaxAccel / 255.0;
+	// [0, 255] -> [0, MaxAccel]
+	const double AccelXYRadians = double(ReplicatedAcceleration.AccelXYRadians) * TWO_PI / 255.0;
+	// [0, 255] -> [0, 2PI]
 
 	FVector UnpackedAcceleration(FVector::ZeroVector);
 	FMath::PolarToCartesian(AccelXYMagnitude, AccelXYRadians, UnpackedAcceleration.X, UnpackedAcceleration.Y);
-	UnpackedAcceleration.Z = double(ReplicatedAcceleration.AccelZ) * MaxAccel / 127.0; // [-127, 127] -> [-MaxAccel, MaxAccel]
+	UnpackedAcceleration.Z = double(ReplicatedAcceleration.AccelZ) * MaxAccel / 127.0;
+	// [-127, 127] -> [-MaxAccel, MaxAccel]
 
 	CMPCharacterMovementComponent->SetReplicatedAcceleration(UnpackedAcceleration);
+}
+
+bool ACMPCharacter::UpdateSharedReplication()
+{
+	if (GetLocalRole() == ROLE_Authority)
+	{
+		FSharedRepMovement SharedMovement;
+		if (SharedMovement.FillForCharacter(this))
+		{
+			// Only call FastSharedReplication if data has changed since the last frame.
+			// Skipping this call will cause replication to reuse the same bunch that we previously
+			// produced, but not send it to clients that already received. (But a new client who has not received
+			// it, will get it this frame)
+			if (!SharedMovement.Equals(LastSharedReplication, this))
+			{
+				LastSharedReplication = SharedMovement;
+				ReplicatedMovementMode = SharedMovement.RepMovementMode;
+
+				FastSharedReplication(SharedMovement);
+			}
+			return true;
+		}
+	}
+
+	// We cannot fastrep right now. Don't send anything.
+	return false;
+}
+
+void ACMPCharacter::FastSharedReplication_Implementation(const FSharedRepMovement& SharedRepMovement)
+{
+	if (GetWorld()->IsPlayingReplay())
+	{
+		return;
+	}
+
+	// Timestamp is checked to reject old moves.
+	if (GetLocalRole() == ROLE_SimulatedProxy)
+	{
+		// Timestamp
+		ReplicatedServerLastTransformUpdateTimeStamp = SharedRepMovement.RepTimeStamp;
+
+		// Movement mode
+		if (ReplicatedMovementMode != SharedRepMovement.RepMovementMode)
+		{
+			ReplicatedMovementMode = SharedRepMovement.RepMovementMode;
+			GetCharacterMovement()->bNetworkMovementModeChanged = true;
+			GetCharacterMovement()->bNetworkUpdateReceived = true;
+		}
+
+		// Location, Rotation, Velocity, etc.
+		FRepMovement& MutableRepMovement = GetReplicatedMovement_Mutable();
+		MutableRepMovement = SharedRepMovement.RepMovement;
+
+		// This also sets LastRepMovement
+		OnRep_ReplicatedMovement();
+
+		// Jump force
+		bProxyIsJumpForceApplied = SharedRepMovement.bProxyIsJumpForceApplied;
+
+		// Crouch
+		if (bIsCrouched != SharedRepMovement.bIsCrouched)
+		{
+			bIsCrouched = SharedRepMovement.bIsCrouched;
+			OnRep_IsCrouched();
+		}
+	}
 }

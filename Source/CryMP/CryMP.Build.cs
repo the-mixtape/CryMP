@@ -7,16 +7,18 @@ public class CryMP : ModuleRules
 	public CryMP(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput" });
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "AnimGraphRuntime" });
-		
-		PublicIncludePaths.AddRange(new string[] {"CryMP/Public/Player", "CryMP/Public/Framework", "CryMP/Public/Guns"});
+		PublicDependencyModuleNames.AddRange(new string[]
+			{ "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput" });
+
+		PrivateDependencyModuleNames.AddRange(new string[] { "AnimGraphRuntime", "ReplicationGraph" });
+
+		PublicIncludePaths.AddRange(new string[]
+			{ "CryMP/Public/Player", "CryMP/Public/Framework", "CryMP/Public/Guns" });
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
-		
+
 		// Uncomment if you are using online features
 		// PrivateDependencyModuleNames.Add("OnlineSubsystem");
 

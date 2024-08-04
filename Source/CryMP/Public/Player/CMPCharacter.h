@@ -33,6 +33,46 @@ struct FCMPReplicatedAcceleration
 	int8 AccelZ = 0;	// Raw Z accel rate component, quantized to represent [-MaxAcceleration, MaxAcceleration]
 };
 
+
+/** The type we use to send FastShared movement updates. */
+USTRUCT()
+struct FSharedRepMovement
+{
+	GENERATED_BODY()
+
+	FSharedRepMovement();
+
+	bool FillForCharacter(ACharacter* Character);
+	bool Equals(const FSharedRepMovement& Other, ACharacter* Character) const;
+
+	bool NetSerialize(FArchive& Ar, class UPackageMap* Map, bool& bOutSuccess);
+
+	UPROPERTY(Transient)
+	FRepMovement RepMovement;
+
+	UPROPERTY(Transient)
+	float RepTimeStamp = 0.0f;
+
+	UPROPERTY(Transient)
+	uint8 RepMovementMode = 0;
+
+	UPROPERTY(Transient)
+	bool bProxyIsJumpForceApplied = false;
+
+	UPROPERTY(Transient)
+	bool bIsCrouched = false;
+};
+
+template<>
+struct TStructOpsTypeTraits<FSharedRepMovement> : public TStructOpsTypeTraitsBase2<FSharedRepMovement>
+{
+	enum
+	{
+		WithNetSerializer = true,
+		WithNetSharedSerialization = true,
+	};
+};
+
 UCLASS()
 class CRYMP_API ACMPCharacter : public ACharacter
 {
@@ -86,11 +126,7 @@ private:
 
 	/** Run Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* RunAction;
-
-	/** Run Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* WalkAction;
+	UInputAction* JogAction;
 
 	/** Crouch Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
@@ -108,12 +144,8 @@ protected:
 	void AimFinished(const FInputActionValue& Value);
 
 	/** Called for sprint input */
-	void RunStarted(const FInputActionValue& Value);
-	void RunFinished(const FInputActionValue& Value);
-
-	/** Called for walk input */
-	void WalkStarted(const FInputActionValue& Value);
-	void WalkFinished(const FInputActionValue& Value);
+	void JogStarted(const FInputActionValue& Value);
+	void JogFinished(const FInputActionValue& Value);
 
 	/** Called for crouch input */
 	void CrouchPressed(const FInputActionValue& Value);
@@ -121,9 +153,7 @@ protected:
 	/** Called for jump input */
 	void JumpPressed(const FInputActionValue& Value);
 	void JumpReleased(const FInputActionValue& Value);
-
-private:
-	bool bIsWalkPressed;
+#pragma endregion
 #pragma endregion
 
 #pragma region Weapon
@@ -243,4 +273,15 @@ private:
 private:
 	UFUNCTION()
 	void OnRep_ReplicatedAcceleration();
+
+public:
+	
+	/** RPCs that is called on frames when default property replication is skipped. This replicates a single movement update to everyone. */
+	UFUNCTION(NetMulticast, unreliable)
+	void FastSharedReplication(const FSharedRepMovement& SharedRepMovement);
+
+	// Last FSharedRepMovement we sent, to avoid sending repeatedly.
+	FSharedRepMovement LastSharedReplication;
+
+	virtual bool UpdateSharedReplication();
 };

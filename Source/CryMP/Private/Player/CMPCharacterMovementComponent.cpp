@@ -11,8 +11,7 @@
 #pragma region Saved Move
 UCMPCharacterMovementComponent::FSavedMove_CMP::FSavedMove_CMP()
 {
-	Saved_bWantsToRun = 0;
-	Saved_bWantsToWalk = 0;
+	Saved_bWantsToJog = 0;
 }
 
 bool UCMPCharacterMovementComponent::FSavedMove_CMP::CanCombineWith(const FSavedMovePtr& NewMove,
@@ -20,8 +19,7 @@ bool UCMPCharacterMovementComponent::FSavedMove_CMP::CanCombineWith(const FSaved
 {
 	const FSavedMove_CMP* NewCMPMove = static_cast<FSavedMove_CMP*>(NewMove.Get());
 
-	if (NewCMPMove->Saved_bWantsToRun != Saved_bWantsToRun) return false;
-	if (NewCMPMove->Saved_bWantsToWalk != Saved_bWantsToWalk) return false;
+	if (NewCMPMove->Saved_bWantsToJog != Saved_bWantsToJog) return false;
 
 	return Super::CanCombineWith(NewMove, InCharacter, MaxDelta);
 }
@@ -30,16 +28,14 @@ void UCMPCharacterMovementComponent::FSavedMove_CMP::Clear()
 {
 	Super::Clear();
 
-	Saved_bWantsToRun = 0;
-	Saved_bWantsToWalk = 0;
+	Saved_bWantsToJog = 0;
 }
 
 uint8 UCMPCharacterMovementComponent::FSavedMove_CMP::GetCompressedFlags() const
 {
 	uint8 Result = Super::GetCompressedFlags();
 
-	if (Saved_bWantsToRun) Result |= FLAG_Custom_0;
-	if (Saved_bWantsToWalk) Result |= FLAG_Custom_1;
+	if (Saved_bWantsToJog) Result |= FLAG_Custom_0;
 
 	return Result;
 }
@@ -52,8 +48,7 @@ void UCMPCharacterMovementComponent::FSavedMove_CMP::SetMoveFor(ACharacter* C, f
 
 	const auto CharacterMovement = Cast<UCMPCharacterMovementComponent>(C->GetCharacterMovement());
 
-	Saved_bWantsToRun = CharacterMovement->Safe_bWantsToRun;
-	Saved_bWantsToWalk = CharacterMovement->Safe_bWantsToWalk;
+	Saved_bWantsToJog = CharacterMovement->Safe_bWantsToJog;
 }
 
 void UCMPCharacterMovementComponent::FSavedMove_CMP::PrepMoveFor(ACharacter* C)
@@ -61,8 +56,7 @@ void UCMPCharacterMovementComponent::FSavedMove_CMP::PrepMoveFor(ACharacter* C)
 	Super::PrepMoveFor(C);
 
 	const auto CharacterMovement = Cast<UCMPCharacterMovementComponent>(C->GetCharacterMovement());
-	CharacterMovement->Safe_bWantsToRun = Saved_bWantsToRun;
-	CharacterMovement->Safe_bWantsToWalk = Saved_bWantsToWalk;
+	CharacterMovement->Safe_bWantsToJog = Saved_bWantsToJog;
 }
 #pragma endregion
 
@@ -82,7 +76,6 @@ FSavedMovePtr UCMPCharacterMovementComponent::FNetworkPredictionData_Client_CMP:
 UCMPCharacterMovementComponent::UCMPCharacterMovementComponent()
 {
 	NavAgentProps.bCanCrouch = true;
-	SetIsReplicatedByDefault(true);
 }
 
 void UCMPCharacterMovementComponent::SimulateMovement(float DeltaTime)
@@ -104,8 +97,8 @@ void UCMPCharacterMovementComponent::InitializeComponent()
 {
 	Super::InitializeComponent();
 
-	SetTargetGait(EGaits::ECMS_Jog, JogSettings);
-	UseGaitSettings(JogSettings);
+	CurrentGait = EGaits::ECMS_Walk;
+	UseGaitSettings(WalkSettings);
 }
 
 FNetworkPredictionData_Client* UCMPCharacterMovementComponent::GetPredictionData_Client() const
@@ -128,15 +121,14 @@ void UCMPCharacterMovementComponent::GetLifetimeReplicatedProps(TArray<FLifetime
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(UCMPCharacterMovementComponent, CurrentGait);
+	DOREPLIFETIME_CONDITION(UCMPCharacterMovementComponent, Safe_bWantsToJog, COND_SkipOwner);
 }
 
 void UCMPCharacterMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
 {
 	Super::UpdateFromCompressedFlags(Flags);
 
-	Safe_bWantsToRun = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
-	Safe_bWantsToWalk = (Flags & FSavedMove_Character::FLAG_Custom_1) != 0;
+	Safe_bWantsToJog = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
 }
 
 void UCMPCharacterMovementComponent::OnMovementUpdated(float DeltaSeconds, const FVector& OldLocation,
@@ -144,29 +136,28 @@ void UCMPCharacterMovementComponent::OnMovementUpdated(float DeltaSeconds, const
 {
 	Super::OnMovementUpdated(DeltaSeconds, OldLocation, OldVelocity);
 
-	bIsAccelerating = Velocity.Size() > OldVelocity.Size();
-	
 	if (MovementMode == MOVE_Walking)
 	{
 		const auto MoveAngle =
 			UKismetAnimationLibrary::CalculateDirection(Velocity, GetPawnOwner()->GetActorRotation());
 		const auto AbsMoveAngle = FMath::Abs(MoveAngle);
 
-		if (Safe_bWantsToRun && AbsMoveAngle <= Run_Angle)
+		if (Safe_bWantsToJog && AbsMoveAngle <= Jog_Angle)
 		{
-			SetTargetGait(EGaits::ECMS_Run, RunSettings);
-			
-		}
-		else if (Safe_bWantsToWalk)
-		{
-			SetTargetGait(EGaits::ECMS_Walk, WalkSettings);
+			if (CurrentGait != EGaits::ECMS_Jog)
+			{
+				CurrentGait = EGaits::ECMS_Jog;
+				UseGaitSettings(JogSettings);
+			}
 		}
 		else
 		{
-			SetTargetGait(EGaits::ECMS_Jog, JogSettings);
+			if (CurrentGait != EGaits::ECMS_Walk)
+			{
+				CurrentGait = EGaits::ECMS_Walk;
+				UseGaitSettings(WalkSettings);
+			}
 		}
-		
-		ApplyGaitSettings();
 	}
 }
 
@@ -175,41 +166,19 @@ void UCMPCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTick T
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	ReplicateMovementState();
 }
 
-void UCMPCharacterMovementComponent::ReplicateMovementState()
+void UCMPCharacterMovementComponent::StartJog()
 {
-	if (!GetOwner()->HasAuthority()) return;
-	if (MovementMode != MOVE_Walking) return;
-
-	if (FMath::IsNearlyEqual(MaxWalkSpeed, RunSettings.MaxWalkSpeed, 0.001f)) CurrentGait = EGaits::ECMS_Run;
-	else if (FMath::IsNearlyEqual(MaxWalkSpeed, WalkSettings.MaxWalkSpeed, 0.001f)) CurrentGait = EGaits::ECMS_Walk;
-	else CurrentGait = EGaits::ECMS_Jog;
+	Safe_bWantsToJog = true;
+	ServerSetWantToJog(true);
 }
 
-void UCMPCharacterMovementComponent::StartRun()
+void UCMPCharacterMovementComponent::StopJog()
 {
-	Safe_bWantsToWalk = false;
-	Safe_bWantsToRun = true;
+	Safe_bWantsToJog = false;
+	ServerSetWantToJog(false);
 }
-
-void UCMPCharacterMovementComponent::StopRun()
-{
-	Safe_bWantsToRun = false;
-}
-
-void UCMPCharacterMovementComponent::StartWalk()
-{
-	Safe_bWantsToRun = false;
-	Safe_bWantsToWalk = true;
-}
-
-void UCMPCharacterMovementComponent::StopWalk()
-{
-	Safe_bWantsToWalk = false;
-}
-
 
 void UCMPCharacterMovementComponent::ToggleCrouch()
 {
@@ -232,9 +201,18 @@ void UCMPCharacterMovementComponent::SetReplicatedAcceleration(const FVector& In
 	Acceleration = InAcceleration;
 }
 
-void UCMPCharacterMovementComponent::OnRep_CurrentGait()
+void UCMPCharacterMovementComponent::SetWantToJog(bool Value)
 {
-	const auto TargetSettings = GetGaitSettings(CurrentGait);
-	SetTargetGait(CurrentGait, TargetSettings);
+	if (!GetOwner()->HasAuthority())
+	{
+		ServerSetWantToJog(Value);
+	}
+
+	Safe_bWantsToJog = Value;
+}
+
+void UCMPCharacterMovementComponent::ServerSetWantToJog_Implementation(bool Value)
+{
+	SetWantToJog(Value);
 }
 #pragma endregion
